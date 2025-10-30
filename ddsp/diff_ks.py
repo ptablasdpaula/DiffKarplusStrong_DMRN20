@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Tuple
+from typing import Tuple, Dict, Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -50,7 +50,8 @@ class DiffKSBase(nn.Module):
         f0: torch.Tensor,         # [B, N] in samples (fractional period)
         input: torch.Tensor,      # [B, N] mono waveform
         l_b: torch.Tensor,        # [B, N, 2] controls → mapped to taps [b0, a1]
-    ) -> torch.Tensor:
+        return_stats: bool = False,
+    ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         self._basic_shape_checks(f0, input, l_b)
 
         taps = self.design_loop(l_b).to(self.dtype)
@@ -64,8 +65,14 @@ class DiffKSBase(nn.Module):
         A, x_eff = self.compute_resonator_matrix(f0=f0_corr, taps=taps, x=x)
 
         # Run sample-wise LPC
-        y = sample_wise_lpc(x_eff, A)
-        return y.to(self.dtype)
+        y = sample_wise_lpc(x_eff, A).to(self.dtype)
+
+        if return_stats:
+            stats: Dict[str, torch.Tensor] = {
+                "taps": taps,  # [B, N, 2] = [b0, a1]
+            }
+            return y, stats
+        return y
 
     def design_loop(self, l_b: torch.Tensor) -> torch.Tensor:
         """

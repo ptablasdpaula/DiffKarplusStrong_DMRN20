@@ -2,10 +2,10 @@
 
 ## ⚙️ Installation
 
-### 1. Clone the repository
+### 1. Clone the repository 
 
 ```bash
-git clone https://github.com/<your-username>/KarplusStrong_DMRN20.git
+git clone --recurse-submodules https://github.com/<your-username>/KarplusStrong_DMRN20.git
 cd KarplusStrong_DMRN20
 ```
 

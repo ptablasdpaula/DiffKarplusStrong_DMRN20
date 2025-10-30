@@ -1,0 +1,3 @@
+[submodule "TB303"]
+	path = TB303
+	url = https://github.com/DiffAPF/TB-303.git
