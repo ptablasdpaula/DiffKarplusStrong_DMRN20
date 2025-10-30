@@ -1,4 +1,4 @@
-# FIR & IIR Karplus–Strong Differentiable Synthesis
+# Differentiable Karplus-Strong
 
 ## ⚙️ Installation
 
