@@ -16,7 +16,7 @@ class DiffKSBase(nn.Module):
     Shapes:
       f0:     [B, N]   fractional period in *samples*
       input:  [B, N]   mono waveform
-      l_b:    [B, N, 2] "logits" or controls to be mapped to taps by design_loop()
+      l_b:    [B, N, 2] params to be mapped to taps by design_loop()
                         (interpreted here as [g, p] in [0,1], then mapped → [b0, a1])
 
       Where B is batch_size, N samples length of mono waveform.
