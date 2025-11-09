@@ -1,3 +1,10 @@
+import os
+
+# If no GPU is allocated, force torchlpc/numba to stay on CPU to avoid hangs.
+if not os.environ.get("CUDA_VISIBLE_DEVICES"):  # empty or unset on CPU nodes
+    os.environ["TORCHLPC_DISABLE_CUDA"] = "1"
+    os.environ["NUMBA_DISABLE_CUDA"] = "1"
+
 import argparse
 from typing import Dict, List, Tuple
 
@@ -30,14 +37,17 @@ def parse_args():
     p.add_argument("--num_frames", type=int, default=16, help="Frames per clip (F)")
 
     # GA hyperparams
-    p.add_argument("--ga_generations", type=int, default=80, help="Number of GA generations")
-    p.add_argument("--ga_popsize", type=int, default=8, help="Population size (solutions per pop)")
-    p.add_argument("--ga_parents_mating", type=int, default=4, help="#parents selected for mating per generation")
+    p.add_argument("--ga_generations", type=int, default=40, help="Number of GA generations")
+    p.add_argument("--ga_popsize", type=int, default=4, help="Population size (solutions per pop)")
+    p.add_argument("--ga_parents_mating", type=int, default=2, help="#parents selected for mating per generation")
     p.add_argument("--ga_init_low", type=float, default=-1.0, help="Initial gene min value")
     p.add_argument("--ga_init_high", type=float, default=1.0, help="Initial gene max value")
-    p.add_argument("--ga_mutation_prob", type=float, default=0.25, help="Per-gene mutation probability")
-    p.add_argument("--ga_mutation_sigma", type=float, default=0.10, help="Random mutation range (+/-)")
-    p.add_argument("--ga_keep_elite", type=int, default=0, help="Number of elitism solutions to keep")
+    p.add_argument("--ga_mutation_prob", type=float, default=0.5, help="Per-gene mutation probability")
+    p.add_argument("--ga_mutation_sigma", type=float, default=1.0, help="Random mutation range (+/-)")
+    p.add_argument("--ga_keep_elite", type=int, default=1, help="Number of elitism solutions to keep")
+
+    p.add_argument("--max_samples", type=int, default=None,
+                   help="Crop audio to at most this many samples per item (None or <=0 to disable)")
 
     p.add_argument("--num_batches", type=int, default=None,
                    help="Max batches to run per (octave, velocity) combo (for quick tests)")
@@ -80,6 +90,8 @@ def run_ga_over_loader(
     ga_mutation_prob: float,
     ga_mutation_sigma: float,
     ga_keep_elite: int,
+    max_samples: int | None,
+    ga_random_seed: int,
 ) -> Tuple[List[List[float]], List[torch.Tensor], List[torch.Tensor]]:
     """
     GA optimisation: return per-batch fitness curves (best per gen),
@@ -96,6 +108,23 @@ def run_ga_over_loader(
         bursts = bursts.to(device=device, dtype=dtype)
 
         B, T = x_tgt.shape
+
+        # Optional crop to cap runtime (helps on CPU nodes and laptops).
+        if max_samples is not None and max_samples > 0 and T > max_samples:
+            x_tgt = x_tgt[:, :max_samples]
+            f0 = f0[:, :max_samples]
+            bursts = bursts[:, :max_samples]
+            # Re-pack onsets so that indices outside the new T are dropped.
+            new_onsets = torch.full_like(onsets, -1)
+            for i in range(onsets.size(0)):
+                vals = onsets[i]
+                vals = vals[vals >= 0]
+                vals = vals[vals < max_samples]
+                if vals.numel() > 0:
+                    new_onsets[i, :vals.numel()] = vals
+            onsets = new_onsets
+            T = max_samples
+
         D = 6
         genome_len = _flatten_params_shape(B, num_frames, D)
 
@@ -116,8 +145,20 @@ def run_ga_over_loader(
             return fitness
 
         def on_gen(ga_instance):
-            # Record and echo the best fitness each generation
-            best_fitness_curve.append(ga_instance.best_solution()[1])
+            best_fitness = ga_instance.best_solution()[1]
+            best_fitness_curve.append(best_fitness)
+            # Print every generation; cheap and makes progress visible on clusters.
+            print(f"[GA] batch={batch_id} gen={ga_instance.generations_completed} "
+                  f"best_fitness={best_fitness:.6f}", flush=True)
+
+        # Warm-up one forward to trigger any JIT/caches (Numba/torchlpc) and avoid "first-call" stalls.
+        with torch.no_grad():
+            _warm_params = torch.zeros(B, num_frames, D, device=device, dtype=dtype)
+            _warm_samples = F.interpolate(_warm_params.permute(0, 2, 1), size=T, mode="linear", align_corners=True).permute(0, 2, 1)
+            _ = model(params=_warm_samples, f0=f0, onsets=onsets, bursts=bursts)
+
+        print(f"[GA] Starting: batch={batch_id} (oct={octave}, vel={velocity}), "
+              f"T={T}, genome_len={genome_len}, pop={ga_popsize}, gens={ga_generations}", flush=True)
 
         ga = pygad.GA(
             num_generations=ga_generations,
@@ -127,7 +168,7 @@ def run_ga_over_loader(
             num_genes=genome_len,
             init_range_low=ga_init_low,
             init_range_high=ga_init_high,
-            parent_selection_type="rws",
+            parent_selection_type="sss",
             keep_parents=0,
             keep_elitism=ga_keep_elite,
             crossover_type="single_point",
@@ -138,10 +179,14 @@ def run_ga_over_loader(
             gene_type=np.float32 if dtype == torch.float32 else np.float64,
             on_generation=on_gen,
             stop_criteria=["saturate_10"],
+            random_seed=ga_random_seed,
         )
 
         # Run GA
         ga.run()
+
+        print(f"[GA] Completed batch={batch_id} (oct={octave}, vel={velocity}). "
+              f"gens={ga.generations_completed} best={ga.best_solution()[1]:.6f}", flush=True)
 
         # Best solution → synthesize final prediction and SAVE (no targets saved)
         best_sol, best_fit, _ = ga.best_solution()
@@ -237,6 +282,8 @@ def main():
                     ga_mutation_prob=args.ga_mutation_prob,
                     ga_mutation_sigma=args.ga_mutation_sigma,
                     ga_keep_elite=args.ga_keep_elite,
+                    max_samples=args.max_samples,
+                    ga_random_seed=args.seed,
                 )
             else:
                 all_bestfits, preds, tgts = run_ga_over_loader(
@@ -256,6 +303,8 @@ def main():
                     ga_mutation_prob=args.ga_mutation_prob,
                     ga_mutation_sigma=args.ga_mutation_sigma,
                     ga_keep_elite=args.ga_keep_elite,
+                    max_samples=args.max_samples,
+                    ga_random_seed=args.seed,
                 )
 
             per_combo_records.append((octave, velocity, all_bestfits, preds, tgts))
