@@ -2,4 +2,7 @@
 .venv/
 .DS_Store
 __pycache__/
-*.pyc
+*.pycdata/nsynth/
+data/nsynth/
+data/nsynth_preprocessed/
+experiments/results/

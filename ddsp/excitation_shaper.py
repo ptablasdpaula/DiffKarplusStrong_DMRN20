@@ -1,43 +1,48 @@
 import torch
 import torch.nn as nn
-from TB303.acid_ddsp.filters import TimeVaryingLPBiquad
+
+import sys, os
 from .utils import map_logspace, segment_ids_from_onsets, piecewise_average_by_segments
 
-def all_zero_fir(x: torch.Tensor,  # [B, T] mono input
-                 A: torch.Tensor   # [B, T, D] where D is order
-                 ) -> torch.Tensor: # [B, T]
+tb303_util_path = os.path.join(
+    os.path.dirname(__file__), "..", "TB303", "acid_ddsp"
+)
+tb303_util_path = os.path.abspath(tb303_util_path)
+
+if tb303_util_path not in sys.path:
+    sys.path.insert(0, tb303_util_path)
+
+from TB303.acid_ddsp.filters import TimeVaryingLPBiquad
+
+def tv_all_zero_fir(x: torch.Tensor,    # [B, T] mono input
+                    A: torch.Tensor     # [B, T, D] where D is filter order
+                    ) -> torch.Tensor:  # [B, T]
     B, T = x.shape
     D = A.shape[2]
 
-    # Zero initial conditions for the D delayed taps
-    initial = x.new_zeros(B, D, device=x.device)
-
-    # Pad x on the left with D zeros, then collect shifted versions x[n-1]..x[n-D]
-    x_padded = torch.cat([initial, x], dim=1)  # [B, D+T]
+    x_padded = torch.cat([torch.zeros(B, D, device=x.device, dtype=x.dtype), x], dim=1)  # [B, D+T]
     shifts = torch.stack([x_padded[:, D - k:D - k + T] for k in range(1, D + 1)], dim=2)  # [B, T, D]
+    return x + torch.sum(A * shifts, dim=2) # Direct term plus weighted sum of delayed taps
 
-    return x + (A * shifts).sum(dim=2) # direct term (1 * x) plus sum of delayed taps
+def pluck_comb(f0,      # [B, T] length (L) of string
+               mu,      # [B, T] ratio of L (0.5 -> middle of string)
+               input,   # [B, T]
+               ) -> torch.Tensor: # [B, T]
+    B, T = input.shape
+    batch_indices = torch.arange(B, device=input.device).view(-1, 1).expand(-1, T)
+    sample_indices = torch.arange(T, device=input.device).view(1, -1).expand(B, -1)
 
-def pluck_comb(f0, mu, input):
-    batch_size, n_samples = input.shape
-
-    # Where f0 is the length of the string in samples, and mu is the ratio of the point in the string from 0 to 1 (0.5 means middle of string):
     pluck_position = f0 * mu
     coeff_vector_size = int(torch.ceil(pluck_position.max()).item()) + 2
 
-    A = torch.zeros((batch_size, n_samples, coeff_vector_size),
-                    device=input.device, dtype=input.dtype)
-
-    batch_indices = torch.arange(batch_size, device=input.device).view(-1, 1).expand(-1, n_samples)
-    sample_indices = torch.arange(n_samples, device=input.device).view(1, -1).expand(batch_size, -1)
-
-    # We create the matrix of coefficients A through linear interpolation:
     z_l = torch.floor(pluck_position).long()
     alfa = pluck_position - z_l
+
+    A = torch.zeros((B, T, coeff_vector_size), device=input.device, dtype=input.dtype)
     A[batch_indices, sample_indices, z_l] = - (1 - alfa)
     A[batch_indices, sample_indices, z_l + 1] = -alfa
 
-    return all_zero_fir(input, A)
+    return tv_all_zero_fir(input, A)
 
 class ExcitationShaper(nn.Module):
     """
@@ -60,8 +65,12 @@ class ExcitationShaper(nn.Module):
         max_d: float = 2.0,
         mod_parameters: bool = True,
         average_per_onset: bool = True,
+        device : torch.device = torch.device("cpu"),
+        dtype: torch.dtype = torch.float32,
     ):
         super().__init__()
+        self.device = device
+        self.dtype = dtype
         self.mod_parameters = mod_parameters
         self.average_per_onset = average_per_onset
         self.min_d = min_d
@@ -70,7 +79,7 @@ class ExcitationShaper(nn.Module):
         self.dynamics_filter = TimeVaryingLPBiquad(
             min_w=2.0 * torch.pi * 20.0 / sr,
             max_q=max_q,
-        )
+        ).to(device=device, dtype=dtype)
 
     def _average_params(self, params, onsets):
         if not self.average_per_onset:
@@ -83,11 +92,7 @@ class ExcitationShaper(nn.Module):
     def _constrain_params(self, logits: torch.Tensor):
         if not self.mod_parameters:
             return logits.unbind(dim=-1)
-        distance = map_logspace(
-            torch.sigmoid(logits[..., 0]),
-            min=self.min_d,
-            max=self.max_d,
-        )
+        distance = map_logspace(torch.sigmoid(logits[..., 0]), min=self.min_d, max=self.max_d,)
         w_mod = torch.sigmoid(logits[..., 1])
         q_mod = torch.sigmoid(logits[..., 2])
         mu = torch.sigmoid(logits[..., 3])
@@ -116,9 +121,14 @@ class ExcitationShaper(nn.Module):
         f0: torch.Tensor,             # [B, T]
         input: torch.Tensor,          # [B, T]
         params: torch.Tensor,         # [B, T, 4]
-        onsets: torch.Tensor | None = None,
+        onsets: torch.Tensor,
         return_stats: bool = False,
     ):
+        input = input.to(device=self.device, dtype=self.dtype)
+        f0 = f0.to(device=self.device, dtype=self.dtype)
+        params = params.to(device=self.device, dtype=self.dtype)
+        onsets = onsets.to(device=self.device)
+
         assert input.dim() == 2, "input must be [B, T]"
         B, T = input.shape
         assert f0.shape == (B, T)

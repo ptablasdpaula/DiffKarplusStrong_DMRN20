@@ -141,9 +141,17 @@ class LogMSSLoss(nn.Module):
             w = self.make_window(window, win_length)
             self.register_buffer(f"window_{win_length}", w)
 
-    def forward(self, x: torch.Tensor, x_target: torch.Tensor) -> torch.Tensor:
+    def interp_to_sample_rate(f0_frames: np.ndarray, T: int, sr: int, hop: int) -> np.ndarray:
+        """Interpolate frame-rate f0 (Hz) to sample rate (length T)."""
+        t_audio = np.arange(T) / sr
+        t_f0 = (np.arange(len(f0_frames)) * hop) / sr
+        return np.interp(t_audio, t_f0, f0_frames)
+
+    def forward(self, x: torch.Tensor, x_target: torch.Tensor, normalize: bool = False) -> torch.Tensor:
         """
         x, x_target: [B, 1, T]
+        normalize: if True, normalize the Lp distance by the number of time-frequency bins per STFT scale.
+
         Returns scalar loss.
         """
         assert x.ndim == x_target.ndim == 3, "inputs must be [B, 1, T]"
@@ -183,8 +191,17 @@ class LogMSSLoss(nn.Module):
                 log_Sx = torch.log(self.gamma * Sx + self.log_mag_eps)
                 log_Sx_target = torch.log(self.gamma * Sx_target + self.log_mag_eps)
 
-            # p-norm across time/frequency
-            dist = torch.linalg.vector_norm(log_Sx_target - log_Sx, ord=self.p, dim=(-2, -1))
+            diff = log_Sx_target - log_Sx
+
+            if not normalize:
+                dist = torch.linalg.vector_norm(diff, ord=self.p, dim=(-2, -1))
+            else:
+                n_time, n_freq = diff.shape[-2], diff.shape[-1]
+                if self.p == 1:
+                    dist = diff.abs().mean(dim=(-2, -1))
+                else:
+                    dist = torch.linalg.vector_norm(diff, ord=self.p, dim=(-2, -1)) / (n_time * n_freq) ** (1 / self.p)
+
             dists.append(dist)
 
         return torch.stack(dists, dim=1).sum(dim=1).mean()

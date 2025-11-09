@@ -16,7 +16,7 @@ class DiffKSBase(nn.Module):
     Shapes:
       f0:     [B, N]   fractional period in *samples*
       input:  [B, N]   mono waveform
-      l_b:    [B, N, 2] params to be mapped to taps by design_loop()
+      params:    [B, N, 2] params to be mapped to taps by design_loop()
                         (interpreted here as [g, p] in [0,1], then mapped → [b0, a1])
 
       Where B is batch_size, N samples length of mono waveform.
@@ -49,12 +49,12 @@ class DiffKSBase(nn.Module):
         self,
         f0: torch.Tensor,         # [B, N] in samples (fractional period)
         input: torch.Tensor,      # [B, N] mono waveform
-        l_b: torch.Tensor,        # [B, N, 2] controls → mapped to taps [b0, a1]
+        params: torch.Tensor,        # [B, N, 2] controls → mapped to taps [b0, a1]
         return_stats: bool = False,
     ) -> torch.Tensor | Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-        self._basic_shape_checks(f0, input, l_b)
+        self._basic_shape_checks(f0, input, params)
 
-        taps = self.design_loop(l_b).to(self.dtype)
+        taps = self.design_loop(params).to(self.dtype)
         f0   = f0.to(self.dtype)
         x    = input.to(self.dtype)
 
@@ -76,7 +76,7 @@ class DiffKSBase(nn.Module):
 
     def design_loop(self, l_b: torch.Tensor) -> torch.Tensor:
         """
-        Map user controls l_b[..., (g, p)] ∈ [0,1]^2 to loop taps [b0, a1].
+        Map user controls params[..., (g, p)] ∈ [0,1]^2 to loop taps [b0, a1].
         """
         raise NotImplementedError
 
@@ -123,12 +123,12 @@ class DiffKSBase(nn.Module):
         return weights
 
     @staticmethod
-    def _basic_shape_checks(f0: torch.Tensor, x: torch.Tensor, l_b: torch.Tensor) -> None:
+    def _basic_shape_checks(f0: torch.Tensor, x: torch.Tensor, params: torch.Tensor) -> None:
         assert f0.dim() == 2 and x.dim() == 2, "f0 and input must be [B, N]"
-        assert l_b.dim() == 3 and l_b.size(-1) == 2, "l_b must be [B, N, 2]"
+        assert params.dim() == 3 and params.size(-1) == 2, "params must be [B, N, 2]"
         B, N = x.shape
         assert f0.shape == (B, N), "f0 must match input shape"
-        assert l_b.shape[:2] == (B, N), "l_b must match input shape"
+        assert params.shape[:2] == (B, N), "params must match input shape"
 
     def _allocate_A(self, f0: torch.Tensor) -> Tuple[torch.Tensor, int]:
         """
@@ -269,7 +269,7 @@ class DiffKSFIRLoop(DiffKSBase):
 
 class LearnableCoefficientsMixin:
     """
-    Mixin that maps unconstrained logits l_b to constrained controls:
+    Mixin that maps unconstrained logits params to constrained controls:
       g = g_min + (1 - g_min) * sigmoid(g_raw)  in [g_min, 1.0]
       p = sigmoid(p_raw)                        in [0, 1]
     Override order does not matter as long as this mixin appears before the loop class
@@ -289,7 +289,7 @@ class LearnableCoefficientsMixin:
 
 class DiffKSIIRLoopLearnableCoefficients(LearnableCoefficientsMixin, DiffKSIIRLoop):
     """
-    IIR loop with learnable (unconstrained) controls l_b.
+    IIR loop with learnable (unconstrained) controls params.
     Uses LearnableCoefficientsMixin to constrain g and p via sigmoid.
     Pass `g_min` to constructor to change the lower bound (default 0.9).
     """
@@ -297,7 +297,7 @@ class DiffKSIIRLoopLearnableCoefficients(LearnableCoefficientsMixin, DiffKSIIRLo
 
 class DiffKSFIRLoopLearnableCoefficients(LearnableCoefficientsMixin, DiffKSFIRLoop):
     """
-    FIR loop with learnable (unconstrained) controls l_b.
+    FIR loop with learnable (unconstrained) controls params.
     Uses LearnableCoefficientsMixin to constrain g and p via sigmoid.
     Pass `g_min` to constructor to change the lower bound (default 0.9).
     """
