@@ -22,8 +22,9 @@ def preprocess_nsynth_guitar_acoustic(
     splits: List[str] = ("test",),
     seed: int = 42,
 ) -> None:
-    nsynth_root = Path(nsynth_root)
-    out_dir = Path(out_dir)
+    script_dir = Path(__file__).resolve().parent
+    nsynth_root = (script_dir / nsynth_root).resolve()
+    out_dir = (script_dir / out_dir).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for split in splits:
@@ -117,7 +118,9 @@ class GuitarAcousticDataset(torch.utils.data.Dataset):
     Only includes: guitar/acoustic, E2..E6, no-reverb (by construction of metadata).
     """
     def __init__(self, root: str = "nsynth_preprocessed", split: str = "test"):
-        self.base = Path(root) / split
+        repo_root = Path(__file__).resolve().parent.parent
+        data_root = repo_root / "data"
+        self.base = data_root / Path(root) / split  # e.g., <repo>/data/nsynth_preprocessed/test
         self.meta = json.loads((self.base / "metadata.json").read_text())
         self.keys = list(self.meta.keys())
 
@@ -126,8 +129,8 @@ class GuitarAcousticDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx: int):
         k = self.keys[idx]
-        item_path = Path(self.meta[k]["path"])
-        pt = torch.load(Path(self.base.parent) / item_path, weights_only=True)
+        item_path = self.base.parent / Path(self.meta[k]["path"])  # <repo>/data/nsynth_preprocessed/test/items/<file>.pt
+        pt = torch.load(item_path, weights_only=True)
 
         audio  = pt["audio"].float()         # (T,)
         f0_hz  = pt["f0_hz"].float()         # (T,)

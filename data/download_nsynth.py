@@ -5,7 +5,7 @@ import time
 from tqdm import tqdm
 
 NSYNTH_TEST_URL = "http://download.magenta.tensorflow.org/datasets/nsynth/nsynth-test.jsonwav.tar.gz"
-TARGET_DIR = Path("nsynth")
+TARGET_DIR = Path(__file__).resolve().parent / "nsynth"
 TARGET_DIR.mkdir(parents=True, exist_ok=True)
 
 def download_file(url, target_path):

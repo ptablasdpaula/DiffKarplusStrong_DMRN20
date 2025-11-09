@@ -24,7 +24,7 @@ from data.preprocess_subset import GuitarAcousticDataset
 # -----------------------------
 SR: int = 16000
 SPLIT: str = "test"
-ROOT: str = "data/nsynth_preprocessed"
+ROOT: str = "nsynth_preprocessed"
 
 # MIDI boundaries: E2=40, E3=52, E4=64, E5=76, E6=88
 OCT_BOUNDS: Dict[int, Tuple[int, int]] = {
@@ -75,6 +75,7 @@ def seed_worker(worker_id: int) -> None:
 def get_device() -> torch.device:
     """Prefer CUDA, else CPU."""
     if torch.cuda.is_available():
+        print("Using CUDA device for computation.")
         return torch.device("cuda")
     return torch.device("cpu")
 
@@ -88,6 +89,14 @@ def parse_args():
     p.add_argument("--num_batches", type=int, default=None,
                    help="Max batches to run per (octave, velocity) combo (for quick tests)")
     p.add_argument("--seed", type=int, default=1337, help="Random seed for reproducibility")
+    p.add_argument("--es_window", type=int, default=20,
+                   help="Early stopping window (iterations) for mean/variance checks")
+    p.add_argument("--es_mean_pct", type=float, default=5.0,
+                   help="Stop if mean loss improves < this percent over the last window")
+    p.add_argument("--es_var_pct", type=float, default=5.0,
+                   help="Stop if variance change < this percent over the last window")
+    p.add_argument("--min_iters", type=int, default=20,
+                   help="Minimum iterations before early stopping is considered")
     return p.parse_args()
 
 
@@ -124,7 +133,25 @@ def indices_for_octave_velocity(ds: GuitarAcousticDataset, octave: int, velocity
 
 
 # -----------------------------
-# Optimization loop (per loader)
+# Per-sample loss for early stopping
+# -----------------------------
+def _batch_per_sample_loss(loss_fn: nn.Module, y_pred_bt: torch.Tensor, x_tgt_bt: torch.Tensor) -> torch.Tensor:
+    """Compute per-sample non-normalized loss using the training criterion."""
+    B = y_pred_bt.shape[0]
+    vals = []
+    with torch.no_grad():
+        for b in range(B):
+            yb = y_pred_bt[b:b+1].unsqueeze(1)
+            xb = x_tgt_bt[b:b+1].unsqueeze(1)
+            lb = loss_fn(yb, xb)
+            if not isinstance(lb, torch.Tensor):
+                lb = torch.tensor(lb, device=yb.device)
+            vals.append(lb.detach().reshape(()))
+    return torch.stack(vals).float()
+
+
+# -----------------------------
+# Optimization loop (per loader) with early stopping
 # -----------------------------
 def run_optim_over_loader(
     loader: DataLoader,
@@ -138,18 +165,17 @@ def run_optim_over_loader(
     octave: int,
     velocity: str,
     save_audio: bool = True,
+    *,
+    es_window: int = 10,
+    es_mean_pct: float = 10.0,
+    es_var_pct: float = 10.0,
+    min_iters: int = 20,
 ) -> Tuple[List[List[float]], List[torch.Tensor], List[torch.Tensor]]:
-    """
-    Runs optimization for each batch in loader. Returns:
-      - all_batch_losses: list over batches of the per-iteration scalar loss values
-      - batch_final_preds: list over batches of final y_pred tensors (on CPU) [B, T]
-      - batch_final_targets: list over batches of target tensors (on CPU) [B, T]
-    """
+    """Run optimization with dual early stopping based on mean and variance improvement."""
     all_batch_losses: List[List[float]] = []
     batch_final_preds: List[torch.Tensor] = []
     batch_final_targets: List[torch.Tensor] = []
 
-    # Define output directories for audio
     AUDIO_TARGET_DIR = Path("experiments/results/audio/target")
     AUDIO_GRADIENT_DIR = Path("experiments/results/audio/gradient")
     AUDIO_TARGET_DIR.mkdir(parents=True, exist_ok=True)
@@ -162,51 +188,74 @@ def run_optim_over_loader(
         bursts = bursts.to(device=device, dtype=dtype)
 
         B, T = x_tgt.shape
-
-        # Fresh learnable logits per batch: [B, F, 6]
         params_frames = nn.Parameter(torch.zeros(B, num_frames, 6, device=device, dtype=dtype))
         opt = optim.AdamW([params_frames], lr=lr)
 
         batch_losses: List[float] = []
-        pbar = tqdm(
-            range(num_iters),
-            desc=f"Batch {batch_id} (octave={octave}, vel={velocity})",
-            leave=False, ncols=100
-        )
+        mean_hist: List[float] = []
+        var_hist: List[float] = []
+        early_stop_triggered = False
 
-        y_pred = None  # for type checker
+        pbar = tqdm(range(num_iters),
+                    desc=f"Batch {batch_id} (octave={octave}, vel={velocity})",
+                    leave=False, ncols=100)
+
+        y_pred = None
         for iter_idx in pbar:
             opt.zero_grad()
-
-            # Interpolate frames -> per-sample params: [B, T, 6]
             params_samples = F.interpolate(
-                params_frames.permute(0, 2, 1),  # [B,6,F]
+                params_frames.permute(0, 2, 1),
                 size=T,
                 mode="linear",
                 align_corners=True
             ).permute(0, 2, 1)
 
-            y_pred = model(params=params_samples, f0=f0, onsets=onsets, bursts=bursts)  # [B, T]
-            loss = loss_fn(y_pred.unsqueeze(1), x_tgt.unsqueeze(1))  # optimization uses *non-normalized* loss
+            y_pred = model(params=params_samples, f0=f0, onsets=onsets, bursts=bursts)
+            loss = loss_fn(y_pred.unsqueeze(1), x_tgt.unsqueeze(1))
             loss.backward()
             opt.step()
 
-            batch_losses.append(loss.item())
-            pbar.set_postfix({"loss": f"{loss.item():.5f}"})
+            loss_scalar = float(loss.item())
+            batch_losses.append(loss_scalar)
 
-            # Save audio at the final iteration
-            if save_audio and iter_idx == num_iters - 1:
+            ps_losses = _batch_per_sample_loss(loss_fn, y_pred, x_tgt)
+            cur_mean = float(ps_losses.mean().item())
+            cur_var = float(ps_losses.var(unbiased=False).item() if ps_losses.numel() > 1 else 0.0)
+            mean_hist.append(cur_mean)
+            var_hist.append(cur_var)
+            pbar.set_postfix({"loss": f"{loss_scalar:.5f}", "μ": f"{cur_mean:.3f}", "σ²": f"{cur_var:.3f}"})
+
+            have_windows = len(mean_hist) >= 2 * es_window
+            if have_windows and (iter_idx + 1) >= min_iters:
+                prev_mean = float(np.mean(mean_hist[-2*es_window:-es_window]))
+                recent_mean = float(np.mean(mean_hist[-es_window:]))
+                prev_var = float(np.mean(var_hist[-2*es_window:-es_window]))
+                recent_var = float(np.mean(var_hist[-es_window:]))
+
+                mean_improve_pct = 100.0 * (prev_mean - recent_mean) / max(abs(prev_mean), 1e-12)
+                var_change_pct = 100.0 * abs(recent_var - prev_var) / max(abs(prev_var), 1e-12)
+
+                if (mean_improve_pct < es_mean_pct) and (var_change_pct < es_var_pct):
+                    early_stop_triggered = True
+
+            if save_audio and (iter_idx == num_iters - 1 or early_stop_triggered):
                 for b in range(y_pred.shape[0]):
                     torchaudio.save(
-                        AUDIO_GRADIENT_DIR / f"oct{octave}_vel{velocity}_batch{batch_id}_sample{b}.wav",
+                        str(AUDIO_GRADIENT_DIR / f"oct{octave}_vel{velocity}_batch{batch_id}_sample{b}.wav"),
                         y_pred[b].detach().cpu().unsqueeze(0),
                         SR
                     )
                     torchaudio.save(
-                        AUDIO_TARGET_DIR / f"oct{octave}_vel{velocity}_batch{batch_id}_sample{b}.wav",
+                        str(AUDIO_TARGET_DIR / f"oct{octave}_vel{velocity}_batch{batch_id}_sample{b}.wav"),
                         x_tgt[b].detach().cpu().unsqueeze(0),
                         SR
                     )
+
+            if early_stop_triggered:
+                pbar.close()
+                print(f"[early-stop] Batch {batch_id} (oct={octave}, vel={velocity}) stopped at iter {iter_idx+1}: "
+                      f"Δmean={mean_improve_pct:.2f}% Δvar={var_change_pct:.2f}% (window={es_window})")
+                break
 
         all_batch_losses.append(batch_losses)
         batch_final_preds.append(y_pred.detach().cpu() if y_pred is not None else torch.empty(0))
@@ -353,6 +402,10 @@ def main():
                     dtype=dtype,
                     octave=octave,
                     velocity=velocity,
+                    es_window=args.es_window,
+                    es_mean_pct=args.es_mean_pct,
+                    es_var_pct=args.es_var_pct,
+                    min_iters=args.min_iters,
                 )
             else:
                 all_losses, preds, tgts = run_optim_over_loader(
@@ -366,6 +419,10 @@ def main():
                     dtype=dtype,
                     octave=octave,
                     velocity=velocity,
+                    es_window=args.es_window,
+                    es_mean_pct=args.es_mean_pct,
+                    es_var_pct=args.es_var_pct,
+                    min_iters=args.min_iters,
                 )
 
             per_combo_records.append((octave, velocity, all_losses, preds, tgts))
