@@ -14,7 +14,6 @@ import os
 import random
 import numpy as np
 
-# repo imports
 from ddsp.timbre_transfer_ks import TimbreTransferKS
 from ddsp.utils import LogMSSLoss
 from data.preprocess_subset import GuitarAcousticDataset
@@ -40,7 +39,6 @@ VEL_VALUES: List[int] = [25, 50, 75, 100, 127]
 
 AUDIO_OUT_DIR = Path("experiments/results/audio")
 TABLE_OUT_DIR = Path("experiments/results/tables")
-
 
 def make_deterministic(seed: int = 1337) -> None:
     """Set seeds and deterministic flags for reproducibility."""
