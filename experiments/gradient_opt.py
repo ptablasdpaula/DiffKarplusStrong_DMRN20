@@ -1,5 +1,9 @@
 import argparse
-from pathlib import Path
+from dirs import (
+    EXPERIMENTS_AUDIO_GRADIENT,
+    EXPERIMENTS_AUDIO_TARGET,
+    EXPERIMENTS_RESULTS_TABLES,
+)
 from typing import Dict, List, Tuple, Optional
 
 import torch
@@ -37,8 +41,6 @@ OCT_BOUNDS: Dict[int, Tuple[int, int]] = {
 VEL_LABELS: List[str] = ["p", "mp", "mf", "f", "ff"]
 VEL_VALUES: List[int] = [25, 50, 75, 100, 127]
 
-AUDIO_OUT_DIR = Path("experiments/results/audio")
-TABLE_OUT_DIR = Path("experiments/results/tables")
 
 def make_deterministic(seed: int = 1337) -> None:
     """Set seeds and deterministic flags for reproducibility."""
@@ -174,8 +176,8 @@ def run_optim_over_loader(
     batch_final_preds: List[torch.Tensor] = []
     batch_final_targets: List[torch.Tensor] = []
 
-    AUDIO_TARGET_DIR = Path("experiments/results/audio/target")
-    AUDIO_GRADIENT_DIR = Path("experiments/results/audio/gradient")
+    AUDIO_TARGET_DIR = EXPERIMENTS_AUDIO_TARGET
+    AUDIO_GRADIENT_DIR = EXPERIMENTS_AUDIO_GRADIENT
     AUDIO_TARGET_DIR.mkdir(parents=True, exist_ok=True)
     AUDIO_GRADIENT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -239,12 +241,12 @@ def run_optim_over_loader(
             if save_audio and (iter_idx == num_iters - 1 or early_stop_triggered):
                 for b in range(y_pred.shape[0]):
                     torchaudio.save(
-                        str(AUDIO_GRADIENT_DIR / f"oct{octave}_vel{velocity}_batch{batch_id}_sample{b}.wav"),
+                        str(AUDIO_GRADIENT_DIR / f"oct{octave}_vel{velocity}_{b}.wav"),
                         y_pred[b].detach().cpu().unsqueeze(0),
                         SR
                     )
                     torchaudio.save(
-                        str(AUDIO_TARGET_DIR / f"oct{octave}_vel{velocity}_batch{batch_id}_sample{b}.wav"),
+                        str(AUDIO_TARGET_DIR / f"oct{octave}_vel{velocity}_{b}.wav"),
                         x_tgt[b].detach().cpu().unsqueeze(0),
                         SR
                     )
@@ -456,8 +458,8 @@ def main():
 
     # Format the combined table and save
     df_table = per_oct_per_vel_table(results_mean, results_var)
-    TABLE_OUT_DIR.mkdir(parents=True, exist_ok=True)
-    df_table.to_csv(TABLE_OUT_DIR / "grad_per_oct_per_vel.csv")
+    EXPERIMENTS_RESULTS_TABLES.mkdir(parents=True, exist_ok=True)
+    df_table.to_csv(EXPERIMENTS_RESULTS_TABLES / "grad_per_oct_per_vel.csv")
 
     print("Combined mean ± variance loss per (octave, velocity):")
     print(df_table)

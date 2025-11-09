@@ -34,8 +34,3 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 ---
-
-
-## TODO
-- Modify audio saving in experiments to oct{octave_number}_vel{dynamics}_{sample_number}
-- Make a paths.py file

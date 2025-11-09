@@ -1,10 +1,3 @@
-import os
-
-# If no GPU is allocated, force torchlpc/numba to stay on CPU to avoid hangs.
-if not os.environ.get("CUDA_VISIBLE_DEVICES"):  # empty or unset on CPU nodes
-    os.environ["TORCHLPC_DISABLE_CUDA"] = "1"
-    os.environ["NUMBA_DISABLE_CUDA"] = "1"
-
 import argparse
 from typing import Dict, List, Tuple
 
@@ -21,11 +14,13 @@ from data.preprocess_subset import GuitarAcousticDataset
 
 from experiments.gradient_opt import (
     SR, SPLIT, ROOT, VEL_LABELS,
-    AUDIO_OUT_DIR, TABLE_OUT_DIR, make_deterministic, seed_worker, get_device,
+    make_deterministic, seed_worker, get_device,
     per_sample_normalized_losses, per_oct_per_vel_table, collate_examples, indices_for_octave_velocity
 )
 
-GENETIC_DIR = AUDIO_OUT_DIR / "genetic"
+from dirs import EXPERIMENTS_AUDIO_GENETIC, EXPERIMENTS_RESULTS_TABLES
+
+GENETIC_DIR = EXPERIMENTS_AUDIO_GENETIC
 GENETIC_DIR.mkdir(parents=True, exist_ok=True)
 
 def parse_args():
@@ -100,6 +95,7 @@ def run_ga_over_loader(
     all_batch_bestfits: List[List[float]] = []
     batch_final_preds: List[torch.Tensor] = []
     batch_final_targets: List[torch.Tensor] = []
+    sample_idx = 0
 
     for batch_id, (x_tgt, f0, onsets, bursts) in enumerate(loader, start=1):
         x_tgt = x_tgt.to(device=device, dtype=dtype)
@@ -108,6 +104,7 @@ def run_ga_over_loader(
         bursts = bursts.to(device=device, dtype=dtype)
 
         B, T = x_tgt.shape
+        assert B == 1, "genetic_opt expects batch_size=1; got B={}".format(B)
 
         # Optional crop to cap runtime (helps on CPU nodes and laptops).
         if max_samples is not None and max_samples > 0 and T > max_samples:
@@ -198,13 +195,13 @@ def run_ga_over_loader(
             ).permute(0, 2, 1)
             y_pred_best = model(params=params_samples_best, f0=f0, onsets=onsets, bursts=bursts)  # [B,T]
 
-        # Save reconstructed audio ONLY
-        for b in range(y_pred_best.shape[0]):
-            torchaudio.save(
-                str(GENETIC_DIR / f"oct{octave}_vel{velocity}_batch{batch_id}_sample{b}.wav"),
-                y_pred_best[b].detach().cpu().unsqueeze(0),
-                SR
-            )
+        # Save reconstructed audio ONLY, one sample at a time with a running index
+        torchaudio.save(
+            str(GENETIC_DIR / f"oct{octave}_vel{velocity}_{sample_idx}.wav"),
+            y_pred_best[0].detach().cpu().unsqueeze(0),
+            SR,
+        )
+        sample_idx += 1
 
         # Bookkeeping for downstream eval table
         all_batch_bestfits.append(best_fitness_curve)
@@ -248,7 +245,7 @@ def main():
             gen.manual_seed(args.seed)
             loader = DataLoader(
                 ds_filt,
-                batch_size=args.batch_size,
+                batch_size=1,
                 shuffle=False,
                 num_workers=0,
                 collate_fn=collate_examples,
@@ -339,8 +336,8 @@ def main():
 
     # Save table
     df_table = per_oct_per_vel_table(results_mean, results_var)
-    TABLE_OUT_DIR.mkdir(parents=True, exist_ok=True)
-    df_table.to_csv(TABLE_OUT_DIR / "gene_per_oct_per_vel.csv")
+    EXPERIMENTS_RESULTS_TABLES.mkdir(parents=True, exist_ok=True)
+    df_table.to_csv(EXPERIMENTS_RESULTS_TABLES / "gene_per_oct_per_vel.csv")
 
     print("GA (genetic) mean ± variance loss per (octave, velocity):")
     print(df_table)
