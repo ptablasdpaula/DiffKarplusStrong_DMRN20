@@ -9,7 +9,7 @@ import torchaudio
 import pygad
 
 from ddsp.timbre_transfer_ks import TimbreTransferKS
-from ddsp.utils import LogMSSLoss
+from ddsp.metrics import LogMSSLoss
 from data.preprocess_subset import GuitarAcousticDataset
 
 from experiments.gradient_opt import (
