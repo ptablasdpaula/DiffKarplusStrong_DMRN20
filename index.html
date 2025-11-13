@@ -55,6 +55,13 @@
     .metrics th strong,
     .metrics td span[style*="font-weight:700"]{font-weight:800 !important;}
   </style>
+<script>
+  window.MathJax = {
+    tex: { inlineMath: [['\\(','\\)'], ['$', '$']] },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 </head>
 <body>
   <!-- ===== HEADER ===== -->
@@ -71,7 +78,7 @@
           </div>
           <div style="margin-top:1rem">
             <a href="static/paper.pdf" target="_blank" class="button is-dark is-rounded"><i class="fas fa-file-pdf"></i>&nbsp;Paper</a>
-            <a href="https://github.com/ptablasdpaula/diffKS_torchLPC" target="_blank" class="button is-dark is-rounded"><i class="fab fa-github"></i>&nbsp;Code</a>
+            <a href="https://github.com/ptablasdpaula/DiffKarplusStrong_DMRN20" target="_blank" class="button is-dark is-rounded"><i class="fab fa-github"></i>&nbsp;Code</a>
           </div>
         </div></div>
       </div>
@@ -123,7 +130,7 @@
       <caption class="table-caption"><strong>Table 2:</strong> \(\mathcal{L}_{\mathrm{MSS}}\) mean difference to overall mean (0.79) across MIDI velocities and octaves for our GD baseline. Negative values are better. "---" are excluded high-variance values.</caption>
       <thead>
         <tr>
-          <th><small>\(\downarrow\) Oct. Vel.\(\rightarrow\)</small></th>
+          <th><small>\(\downarrow\) Oct. Vel. \(\rightarrow\)</small></th>
           <th>25</th>
           <th>50</th>
           <th>75</th>
