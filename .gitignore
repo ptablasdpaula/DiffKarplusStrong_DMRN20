@@ -1,0 +1,14 @@
+# Ignore Python cache + temp
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore system files
+.DS_Store
+
+# Ignore JetBrains IDE files
+.idea/
+
+# Ignore helper scripts you don't want in git
+gen_json.py
