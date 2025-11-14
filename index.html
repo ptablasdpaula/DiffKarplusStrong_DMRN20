@@ -53,19 +53,45 @@
     .is-dark{background:#2c3e50;color:#fff}
     .is-dark:hover{background:#34495e;transform:translateY(-1px)}
 
+    .button.is-dark:disabled,
+    .button.is-dark[disabled] {
+      background:#9aa3b1;
+      cursor:default;
+      opacity:0.6;
+      box-shadow:none;
+    }
+
     .table-caption{max-width:900px;margin:0.5rem auto 0;text-align:center;font-size:0.9rem}
 
     .metrics th,.metrics td{font-size:14px}
     .metrics td strong,
     .metrics th strong,
     .metrics td span[style*="font-weight:700"]{font-weight:800 !important;}
+    .filter-cell{
+      cursor:pointer;
+      transition: background-color 0.15s ease;
+    }
 
-    .val-pos-strong { background-color: rgba(255, 99, 71, 0.25); }
-    .val-pos-med    { background-color: rgba(255, 99, 71, 0.18); }
-    .val-pos-light  { background-color: rgba(255, 99, 71, 0.12); }
-    .val-neg-strong { background-color: rgba(60, 179, 113, 0.25); }
-    .val-neg-med    { background-color: rgba(60, 179, 113, 0.18); }
-    .val-neg-light  { background-color: rgba(60, 179, 113, 0.12); }
+    /* base pastel colours */
+    .val-pos-strong { background-color: rgba(255, 99, 71, 0.22); }
+    .val-pos-med    { background-color: rgba(255, 99, 71, 0.16); }
+    .val-pos-light  { background-color: rgba(255, 99, 71, 0.10); }
+    .val-neg-strong { background-color: rgba(60, 179, 113, 0.22); }
+    .val-neg-med    { background-color: rgba(60, 179, 113, 0.16); }
+    .val-neg-light  { background-color: rgba(60, 179, 113, 0.10); }
+
+    /* slightly more intense on hover for coloured cells */
+    td.val-pos-strong.filter-cell:hover { background-color: rgba(255, 99, 71, 0.30) !important; }
+    td.val-pos-med.filter-cell:hover    { background-color: rgba(255, 99, 71, 0.24) !important; }
+    td.val-pos-light.filter-cell:hover  { background-color: rgba(255, 99, 71, 0.18) !important; }
+    td.val-neg-strong.filter-cell:hover { background-color: rgba(60, 179, 113, 0.30) !important; }
+    td.val-neg-med.filter-cell:hover    { background-color: rgba(60, 179, 113, 0.24) !important; }
+    td.val-neg-light.filter-cell:hover  { background-color: rgba(60, 179, 113, 0.18) !important; }
+
+    /* labels / mean cells without base colour get a subtle grey hover */
+    .filter-cell:hover {
+      background-color: rgba(0, 0, 0, 0.10);
+    }
   </style>
 <script>
   window.MathJax = {
@@ -165,59 +191,59 @@
       <thead>
         <tr>
           <th><small>\(\downarrow\) Oct. Vel. \(\rightarrow\)</small></th>
-          <th>25</th>
-          <th>50</th>
-          <th>75</th>
-          <th>100</th>
-          <th>127</th>
+          <th class="filter-cell" data-vel="25">25</th>
+          <th class="filter-cell" data-vel="50">50</th>
+          <th class="filter-cell" data-vel="75">75</th>
+          <th class="filter-cell" data-vel="100">100</th>
+          <th class="filter-cell" data-vel="127">127</th>
           <th>mean</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td>E2&ndash;E3</td>
-          <td class="val-pos-strong">+0.27</td>
-          <td class="val-pos-med">+0.23</td>
-          <td class="val-pos-strong">+0.33</td>
-          <td class="val-pos-strong">+0.30</td>
-          <td class="val-pos-strong">+0.36</td>
-          <td class="val-pos-strong">+0.30</td>
+          <td class="filter-cell" data-oct="E2-E3">E2&ndash;E3</td>
+          <td class="val-pos-strong filter-cell" data-oct="E2-E3" data-vel="25">+0.27</td>
+          <td class="val-pos-med filter-cell" data-oct="E2-E3" data-vel="50">+0.23</td>
+          <td class="val-pos-strong filter-cell" data-oct="E2-E3" data-vel="75">+0.33</td>
+          <td class="val-pos-strong filter-cell" data-oct="E2-E3" data-vel="100">+0.30</td>
+          <td class="val-pos-strong filter-cell" data-oct="E2-E3" data-vel="127">+0.36</td>
+          <td class="val-pos-strong filter-cell" data-oct="E2-E3">+0.30</td>
         </tr>
         <tr>
-          <td>E3&ndash;E4</td>
-          <td class="val-neg-light">-0.02</td>
-          <td class="val-pos-light">+0.07</td>
-          <td class="val-neg-light">-0.02</td>
-          <td class="val-pos-light">+0.07</td>
-          <td class="val-pos-light">+0.01</td>
-          <td class="val-pos-light">+0.02</td>
+          <td class="filter-cell" data-oct="E3-E4">E3&ndash;E4</td>
+          <td class="val-neg-light filter-cell" data-oct="E3-E4" data-vel="25">-0.02</td>
+          <td class="val-pos-light filter-cell" data-oct="E3-E4" data-vel="50">+0.07</td>
+          <td class="val-neg-light filter-cell" data-oct="E3-E4" data-vel="75">-0.02</td>
+          <td class="val-pos-light filter-cell" data-oct="E3-E4" data-vel="100">+0.07</td>
+          <td class="val-pos-light filter-cell" data-oct="E3-E4" data-vel="127">+0.01</td>
+          <td class="val-pos-light filter-cell" data-oct="E3-E4">+0.02</td>
         </tr>
         <tr>
-          <td>E4&ndash;E5</td>
-          <td class="val-neg-med">-0.18</td>
-          <td class="val-neg-med">-0.10</td>
-          <td class="val-neg-light">-0.05</td>
-          <td class="val-neg-med">-0.13</td>
-          <td class="val-neg-med">-0.08</td>
-          <td class="val-neg-med">-0.11</td>
+          <td class="filter-cell" data-oct="E4-E5">E4&ndash;E5</td>
+          <td class="val-neg-med filter-cell" data-oct="E4-E5" data-vel="25">-0.18</td>
+          <td class="val-neg-med filter-cell" data-oct="E4-E5" data-vel="50">-0.10</td>
+          <td class="val-neg-light filter-cell" data-oct="E4-E5" data-vel="75">-0.05</td>
+          <td class="val-neg-med filter-cell" data-oct="E4-E5" data-vel="100">-0.13</td>
+          <td class="val-neg-med filter-cell" data-oct="E4-E5" data-vel="127">-0.08</td>
+          <td class="val-neg-med filter-cell" data-oct="E4-E5">-0.11</td>
         </tr>
         <tr>
-          <td>E5&ndash;E6</td>
-          <td class="val-neg-med">-0.19</td>
-          <td class="val-neg-strong">-0.26</td>
-          <td class="val-neg-strong">-0.27</td>
-          <td class="val-neg-med">-0.18</td>
-          <td class="val-neg-med">-0.11</td>
-          <td class="val-neg-strong">-0.20</td>
+          <td class="filter-cell" data-oct="E5-E6">E5&ndash;E6</td>
+          <td class="val-neg-med filter-cell" data-oct="E5-E6" data-vel="25">-0.19</td>
+          <td class="val-neg-strong filter-cell" data-oct="E5-E6" data-vel="50">-0.26</td>
+          <td class="val-neg-strong filter-cell" data-oct="E5-E6" data-vel="75">-0.27</td>
+          <td class="val-neg-med filter-cell" data-oct="E5-E6" data-vel="100">-0.18</td>
+          <td class="val-neg-med filter-cell" data-oct="E5-E6" data-vel="127">-0.11</td>
+          <td class="val-neg-strong filter-cell" data-oct="E5-E6">-0.20</td>
         </tr>
         <tr>
           <td><strong>mean</strong></td>
-          <td class="val-neg-light">-0.03</td>
-          <td class="val-neg-light">-0.01</td>
-          <td>+0.00</td>
-          <td class="val-pos-light">+0.02</td>
-          <td class="val-pos-light">+0.05</td>
-          <td>+0.00</td>
+          <td class="val-neg-light filter-cell" data-vel="25">-0.03</td>
+          <td class="val-neg-light filter-cell" data-vel="50">-0.01</td>
+          <td class="filter-cell" data-vel="75">+0.00</td>
+          <td class="val-pos-light filter-cell" data-vel="100">+0.02</td>
+          <td class="val-pos-light filter-cell" data-vel="127">+0.05</td>
+          <td class="filter-cell">+0.00</td>
         </tr>
       </tbody>
     </table>
@@ -225,7 +251,16 @@
     <section class="hero is-small">
       <div class="hero-body">
         <div class="container" id="audio-section-oracle">
-          <button class="button is-dark" id="shuffle-sounds-oracle" style="display:block; margin:0 auto">&#128256; Shuffle Examples</button>
+          <p style="text-align:center; margin:12px 0; font-size:0.95rem; opacity:0.85;">
+            Click any cell in the table above to explore audio examples for that specific combination of pitch and dynamics.
+          </p>
+          <div style="display:flex; justify-content:center; gap:10px; margin-bottom:10px;">
+            <button class="button is-dark" id="prev-page-oracle">&laquo; Previous</button>
+            <button class="button is-dark" id="next-page-oracle">Next &raquo;</button>
+          </div>
+          <div id="oracle-page-indicator" style="text-align:center; margin-bottom:8px; font-size:0.9rem; opacity:0.8;">
+            Page 1 / 1
+          </div>
           <table id="table-sounds-oracle">
             <thead>
               <tr>
@@ -364,6 +399,7 @@
       tbody.appendChild(row);
     });
   }
+  window.renderRows = renderRows;
 
   /* ---------- PAGE INITIALISATION ---------- */
   (async () => {
@@ -391,6 +427,10 @@
   const PATH_ORACLE    = 'audio';
   const MODELS_ORACLE  = ['target','gradient_oracle_f0'];
   const LABELS_ORACLE  = { target:'Ground Truth', gradient_oracle_f0:'Gradient Descent' };
+
+  let poolOracle = [];
+  let currentOracleList = [];
+  let currentOraclePage = 0;
 
   /* ---------- HELPERS ---------- */
   async function getIDsOracle() {
@@ -485,20 +525,121 @@
       tbody.appendChild(row);
     });
   }
+  window.renderRowsOracle = renderRowsOracle;
+
+  function renderPageOracle() {
+    const start = currentOraclePage * ROWS_ORACLE;
+    const pageIds = currentOracleList.slice(start, start + ROWS_ORACLE);
+    renderRowsOracle(pageIds);
+  }
+
+  window.renderPageOracle = renderPageOracle;
+
+  function applyOracleFilter(octLabel, velMidi) {
+    if (!Array.isArray(poolOracle) || poolOracle.length === 0) return;
+
+    const OCT_MAP = {
+      'E2-E3': 'oct1_',
+      'E3-E4': 'oct2_',
+      'E4-E5': 'oct3_',
+      'E5-E6': 'oct4_'
+    };
+
+    const VEL_MAP = {
+      '25':  'velp',
+      '50':  'velmp',
+      '75':  'velmf',
+      '100': 'velf',
+      '127': 'velff'
+    };
+
+    let filtered = poolOracle.slice();
+
+    if (octLabel && OCT_MAP[octLabel]) {
+      const octPrefix = OCT_MAP[octLabel];
+      filtered = filtered.filter(id => id.startsWith(octPrefix));
+    }
+
+    if (velMidi && VEL_MAP[velMidi]) {
+      const velTag = VEL_MAP[velMidi];
+      filtered = filtered.filter(id => id.includes(`_${velTag}_`));
+    }
+
+    currentOracleList = filtered;
+    currentOraclePage = 0;
+    renderPageOracle();
+    updateOracleButtons();
+  }
+
+  window.applyOracleFilter = applyOracleFilter;
 
   /* ---------- PAGE INITIALISATION ---------- */
   (async () => {
-    const shuffleBtnOracle = document.getElementById('shuffle-sounds-oracle');
+    const prevBtnOracle = document.getElementById('prev-page-oracle');
+    const nextBtnOracle = document.getElementById('next-page-oracle');
+    const pageIndicatorOracle = document.getElementById('oracle-page-indicator');
 
-    let poolOracle = await filterValidOracle(await getIDsOracle());
-    let visibleOracle = randOracle(poolOracle, ROWS_ORACLE);
-    renderRowsOracle(visibleOracle);
+    function updateOracleButtons() {
+      const total = currentOracleList.length;
+      const maxPage = total === 0 ? 0 : Math.floor((total - 1) / ROWS_ORACLE);
 
-    shuffleBtnOracle.onclick = () => {
-      visibleOracle = randOracle(poolOracle, ROWS_ORACLE);
-      renderRowsOracle(visibleOracle);
-    };
+      if (prevBtnOracle) {
+        prevBtnOracle.disabled = currentOraclePage <= 0;
+      }
+      if (nextBtnOracle) {
+        nextBtnOracle.disabled = currentOraclePage >= maxPage;
+      }
+
+      if (pageIndicatorOracle) {
+        const totalPages = total === 0 ? 0 : (maxPage + 1);
+        const currentPage = total === 0 ? 0 : (currentOraclePage + 1);
+        pageIndicatorOracle.textContent = `Page ${currentPage} / ${totalPages || 1}`;
+      }
+    }
+
+    window.updateOracleButtons = updateOracleButtons;
+
+    poolOracle = await filterValidOracle(await getIDsOracle());
+    currentOracleList = poolOracle.slice();
+    currentOraclePage = 0;
+    renderPageOracle();
+    updateOracleButtons();
+
+    if (prevBtnOracle) {
+      prevBtnOracle.addEventListener('click', () => {
+        if (currentOraclePage > 0) {
+          currentOraclePage--;
+          renderPageOracle();
+          updateOracleButtons();
+        }
+      });
+    }
+
+    if (nextBtnOracle) {
+      nextBtnOracle.addEventListener('click', () => {
+        const total = currentOracleList.length;
+        const maxPage = total === 0 ? 0 : Math.floor((total - 1) / ROWS_ORACLE);
+        if (currentOraclePage < maxPage) {
+          currentOraclePage++;
+          renderPageOracle();
+          updateOracleButtons();
+        }
+      });
+    }
   })();
   </script>
 </body>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.filter-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const octLabel = cell.dataset.oct || null;
+      const velMidi  = cell.dataset.vel || null;
+      if (window.applyOracleFilter) {
+        window.applyOracleFilter(octLabel, velMidi);
+      }
+    });
+  });
+});
+</script>
 </html>
