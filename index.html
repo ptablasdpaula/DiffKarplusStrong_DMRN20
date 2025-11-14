@@ -36,6 +36,11 @@
     th,td{border:1px solid #e1e5e9;padding:10px;text-align:center}
     th{background:#f0f0f0;font-weight:600}
 
+    #table-sounds-oracle th,
+    #table-sounds-oracle td {
+      width: 50%;
+    }
+
     .play-btn,.ctrl-btn{cursor:pointer;padding:6px 14px;background:#007BFF;color:#fff;border:none;border-radius:6px;font-size:15px;transition:.3s;box-shadow:0 2px 4px rgba(0,0,0,.1)}
     .play-btn:hover,.ctrl-btn:hover{transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,.15)}
     .waveform,.spectrogram{height:80px;background:#e8e8e8;margin:6px 0;border-radius:4px;border:1px solid #ddd}
@@ -54,6 +59,13 @@
     .metrics td strong,
     .metrics th strong,
     .metrics td span[style*="font-weight:700"]{font-weight:800 !important;}
+
+    .val-pos-strong { background-color: rgba(255, 99, 71, 0.25); }
+    .val-pos-med    { background-color: rgba(255, 99, 71, 0.18); }
+    .val-pos-light  { background-color: rgba(255, 99, 71, 0.12); }
+    .val-neg-strong { background-color: rgba(60, 179, 113, 0.25); }
+    .val-neg-med    { background-color: rgba(60, 179, 113, 0.18); }
+    .val-neg-light  { background-color: rgba(60, 179, 113, 0.12); }
   </style>
 <script>
   window.MathJax = {
@@ -70,13 +82,14 @@
       <div class="container is-max-desktop">
         <div class="columns is-centered"><div class="column has-text-centered">
           <h1 class="title is-1">Differentiable Karplus-Strong</h1>
-          <div class="is-size-5">
+          <div class="is-size-5" style="text-align:center">
             <span><a href="https://github.com/ptablasdpaula/" target="_blank">Pablo Tablas de Paula</a>, </span>
             <span><a href="https://github.com/davidmarttila" target="_blank">David Marttila</a>, </span>
             <span><a href="https://www.eecs.qmul.ac.uk/~josh/" target="_blank">Joshua D. Reiss</a></span><br>
-            <span>Centre For Digital Music (C4DM), Queen Mary University Of London &middot; Digital Music Research Network One-day Workshop 2025</span>
+            <span>Centre For Digital Music (C4DM), Queen Mary University Of London</span><br>
+            <span>Digital Music Research Network One-day Workshop 2025</span>
           </div>
-          <div style="margin-top:1rem">
+          <div style="margin-top:1rem; text-align:center">
             <a href="static/paper.pdf" target="_blank" class="button is-dark is-rounded"><i class="fas fa-file-pdf"></i>&nbsp;Paper</a>
             <a href="https://github.com/ptablasdpaula/DiffKarplusStrong_DMRN20" target="_blank" class="button is-dark is-rounded"><i class="fab fa-github"></i>&nbsp;Code</a>
           </div>
@@ -98,7 +111,7 @@
     <h2 class="title is-3">Gradient Descent vs. Genetic Algorithm</h2>
 
     <table>
-      <caption class="table-caption"><strong>Table 1:</strong> Comparison of Gradient Descent and Genetic Algorithm baselines.</caption>
+      <caption class="table-caption"><strong>Table 1:</strong> Baselines Comparison. Lower values, in bold, are better.</caption>
       <thead>
         <tr>
           <th>Baseline</th>
@@ -111,10 +124,10 @@
       <tbody>
         <tr>
           <td>Gradient Descent</td>
-          <td>0.79 &plusmn; 0.11</td>
-          <td>2.32 &plusmn; 1.50</td>
-          <td>19.89</td>
-          <td>111.30</td>
+          <td><strong>0.79 &plusmn; 0.11</strong></td>
+          <td><strong>2.32 &plusmn; 1.50</strong></td>
+          <td><strong>19.89</strong></td>
+          <td><strong>111.30</strong></td>
         </tr>
         <tr>
           <td>Genetic Algorithm</td>
@@ -126,8 +139,29 @@
       </tbody>
     </table>
 
+    <section class="hero is-small">
+      <div class="hero-body">
+        <div class="container" id="audio-section">
+          <button class="button is-dark" id="shuffle-sounds" style="display:block; margin:0 auto">&#128256; Shuffle Examples</button>
+          <table id="table-sounds">
+            <thead>
+              <tr>
+                <th>Ground Truth</th>
+                <th>Gradient Descent</th>
+                <th>Genetic Algorithm</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <h2 class="title is-3">Model Expressivity Test per Octave and Dynamics</h2>
+
     <table>
-      <caption class="table-caption"><strong>Table 2:</strong> \(\mathcal{L}_{\mathrm{MSS}}\) mean difference to overall mean (0.79) across MIDI velocities and octaves for our GD baseline. Negative values are better. "---" are excluded high-variance values.</caption>
+      <caption class="table-caption"><strong>Table 2:</strong> \(\mathcal{L}_{\mathrm{MSS}}\) mean difference to overall mean (0.62) across MIDI velocities and octaves for our GD baseline. Negative values are better.</caption>
       <thead>
         <tr>
           <th><small>\(\downarrow\) Oct. Vel. \(\rightarrow\)</small></th>
@@ -141,76 +175,71 @@
       </thead>
       <tbody>
         <tr>
-          <td>E2--E3</td>
-          <td>+0.16</td>
-          <td>&mdash;</td>
-          <td>+0.17</td>
-          <td>+0.11</td>
-          <td>+0.15</td>
-          <td>+0.13</td>
+          <td>E2&ndash;E3</td>
+          <td class="val-pos-strong">+0.27</td>
+          <td class="val-pos-med">+0.23</td>
+          <td class="val-pos-strong">+0.33</td>
+          <td class="val-pos-strong">+0.30</td>
+          <td class="val-pos-strong">+0.36</td>
+          <td class="val-pos-strong">+0.30</td>
         </tr>
         <tr>
-          <td>E3--E4</td>
-          <td>-0.22</td>
-          <td>&mdash;</td>
-          <td>-0.21</td>
-          <td>-0.11</td>
-          <td>-0.10</td>
-          <td>-0.15</td>
+          <td>E3&ndash;E4</td>
+          <td class="val-neg-light">-0.02</td>
+          <td class="val-pos-light">+0.07</td>
+          <td class="val-neg-light">-0.02</td>
+          <td class="val-pos-light">+0.07</td>
+          <td class="val-pos-light">+0.01</td>
+          <td class="val-pos-light">+0.02</td>
         </tr>
         <tr>
-          <td>E4--E5</td>
-          <td>-0.18</td>
-          <td>+0.09</td>
-          <td>+0.29</td>
-          <td>-0.09</td>
-          <td>-0.18</td>
-          <td>-0.06</td>
+          <td>E4&ndash;E5</td>
+          <td class="val-neg-med">-0.18</td>
+          <td class="val-neg-med">-0.10</td>
+          <td class="val-neg-light">-0.05</td>
+          <td class="val-neg-med">-0.13</td>
+          <td class="val-neg-med">-0.08</td>
+          <td class="val-neg-med">-0.11</td>
         </tr>
         <tr>
-          <td>E5--E6</td>
-          <td>+0.18</td>
-          <td>-0.12</td>
-          <td>+0.21</td>
-          <td>+0.06</td>
-          <td>+0.03</td>
-          <td>+0.08</td>
+          <td>E5&ndash;E6</td>
+          <td class="val-neg-med">-0.19</td>
+          <td class="val-neg-strong">-0.26</td>
+          <td class="val-neg-strong">-0.27</td>
+          <td class="val-neg-med">-0.18</td>
+          <td class="val-neg-med">-0.11</td>
+          <td class="val-neg-strong">-0.20</td>
         </tr>
         <tr>
           <td><strong>mean</strong></td>
-          <td>-0.02</td>
-          <td>-0.15</td>
-          <td>+0.11</td>
-          <td>-0.01</td>
-          <td>-0.03</td>
-          <td>0.00</td>
+          <td class="val-neg-light">-0.03</td>
+          <td class="val-neg-light">-0.01</td>
+          <td>+0.00</td>
+          <td class="val-pos-light">+0.02</td>
+          <td class="val-pos-light">+0.05</td>
+          <td>+0.00</td>
         </tr>
       </tbody>
     </table>
-  </div></section>
 
-  <!-- ===== AUDIO EXAMPLES ===== -->
-  <section class="hero is-small">
-    <div class="hero-body">
-      <div class="container" id="audio-section">
-        <div class="playerHead">
-          <h2 class="title is-4">Audio Examples</h2>
-          <p>Columns correspond to <strong>Ground Truth</strong>, <strong>Gradient Descent</strong> and <strong>Genetic Algorithm</strong>.</p>
-          <button class="button is-dark" id="shuffle-sounds">&#128256; Shuffle Examples</button>
+    <section class="hero is-small">
+      <div class="hero-body">
+        <div class="container" id="audio-section-oracle">
+          <button class="button is-dark" id="shuffle-sounds-oracle" style="display:block; margin:0 auto">&#128256; Shuffle Examples</button>
+          <table id="table-sounds-oracle">
+            <thead>
+              <tr>
+                <th>Ground Truth</th>
+                <th>Gradient Descent</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
-        <table id="table-sounds">
-          <thead>
-            <tr>
-              <th>Ground Truth</th>
-              <th>Gradient Descent</th>
-              <th>Genetic Algorithm</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
       </div>
-    </div>
-  </section>
+    </section>
+
+  </div></section>
 
   <!-- ===== BIBTEX ===== -->
   <section class="section" id="BibTeX"><div class="container is-max-desktop content">
@@ -347,6 +376,127 @@
     shuffleBtn.onclick = () => {
       visible = rand(pool, ROWS);
       renderRows(visible);
+    };
+  })();
+  </script>
+
+  <script type="module">
+  import WaveSurfer from 'https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/wavesurfer.esm.js';
+  import Spectrogram from 'https://cdn.jsdelivr.net/npm/wavesurfer.js@7/dist/plugins/spectrogram.js';
+
+  /* ---------- BASIC CONFIG ---------- */
+  const AUDIO_EXT_ORACLE = '.wav';   // change if your files use another extension
+  const ROWS_ORACLE      = 3;        // how many examples to show at once
+
+  const PATH_ORACLE    = 'audio';
+  const MODELS_ORACLE  = ['target','gradient_oracle_f0'];
+  const LABELS_ORACLE  = { target:'Ground Truth', gradient_oracle_f0:'Gradient Descent' };
+
+  /* ---------- HELPERS ---------- */
+  async function getIDsOracle() {
+    try {
+      const r = await fetch(`${PATH_ORACLE}/index.json`, { cache:'no-store' });
+      return r.ok ? (await r.json()).samples : [];
+    } catch {
+      return [];
+    }
+  }
+
+  const randOracle = (arr, n) => arr.slice().sort(() => 0.5 - Math.random()).slice(0, Math.min(n, arr.length));
+  const iconOracle = (btn, on) => { btn.innerHTML = on ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>'; };
+
+  async function filterValidOracle(ids) {
+    const checks = ids.map(async id => {
+      for (const m of MODELS_ORACLE) {
+        const url  = `${PATH_ORACLE}/${m}/${id}${AUDIO_EXT_ORACLE}`;
+        const resp = await fetch(url, { method:'HEAD' });
+        if (!resp.ok) return null;           // if any model missing → drop this id
+      }
+      return id;
+    });
+    return (await Promise.all(checks)).filter(Boolean);
+  }
+
+  /* ---------- PLAYER CACHE ---------- */
+  const playersOracle = new Map();
+
+  function makePlayerOracle(td, url) {
+    const wf = td.querySelector('.waveform');
+    const sp = td.querySelector('.spectrogram');
+    const ws = WaveSurfer.create({
+      container: wf,
+      backend: 'MediaElement',
+      height: 80,
+      waveColor: '#999',
+      progressColor: '#007BFF',
+      plugins: [
+        Spectrogram.create({ container: sp, scale: 'mel', labels: false, height: 80 })
+      ]
+    });
+    ws.load(url);
+    return ws;
+  }
+
+  function renderRowsOracle(ids) {
+    const tbody = document.querySelector('#table-sounds-oracle tbody');
+    tbody.innerHTML = '';
+
+    // destroy old players
+    playersOracle.forEach(ws => ws.destroy());
+    playersOracle.clear();
+
+    ids.forEach(id => {
+      const row = document.createElement('tr');
+      row.dataset.sample = id;
+
+      MODELS_ORACLE.forEach(m => {
+        const td = document.createElement('td');
+        td.innerHTML = `
+          <div class="controls">
+            <button class="play-btn"><i class="fas fa-play"></i></button>
+            <button class="ctrl-btn" data-act="stop"><i class="fas fa-stop"></i></button>
+            <button class="ctrl-btn" data-act="rew"><i class="fas fa-backward"></i></button>
+          </div>
+          <div class="waveform"></div>
+          <div class="spectrogram"></div>`;
+
+        const url  = `${PATH_ORACLE}/${m}/${id}${AUDIO_EXT_ORACLE}`;
+        const ws   = makePlayerOracle(td, url);
+        const play = td.querySelector('.play-btn');
+        const stop = td.querySelector('[data-act="stop"]');
+        const rew  = td.querySelector('[data-act="rew"]');
+
+        play.onclick = () => {
+          // pause all others
+          playersOracle.forEach((other, btn) => {
+            if (other.isPlaying()) { other.pause(); iconOracle(btn, false); }
+          });
+          if (ws.isPlaying()) { ws.pause(); iconOracle(play, false); }
+          else               { ws.play();  iconOracle(play, true);  }
+        };
+
+        stop.onclick = () => { ws.pause(); ws.seekTo(0); iconOracle(play, false); };
+        rew.onclick  = () => { ws.seekTo(0); ws.play();  iconOracle(play, true);  };
+
+        playersOracle.set(play, ws);
+        row.appendChild(td);
+      });
+
+      tbody.appendChild(row);
+    });
+  }
+
+  /* ---------- PAGE INITIALISATION ---------- */
+  (async () => {
+    const shuffleBtnOracle = document.getElementById('shuffle-sounds-oracle');
+
+    let poolOracle = await filterValidOracle(await getIDsOracle());
+    let visibleOracle = randOracle(poolOracle, ROWS_ORACLE);
+    renderRowsOracle(visibleOracle);
+
+    shuffleBtnOracle.onclick = () => {
+      visibleOracle = randOracle(poolOracle, ROWS_ORACLE);
+      renderRowsOracle(visibleOracle);
     };
   })();
   </script>
